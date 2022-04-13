@@ -58,7 +58,7 @@ private:
     uint8_t magCalibrationAccuracy = 0;
     float magneticAccuracyEstimate = 999;
     bool useMagnetometerAllTheTime = false;
-    bool useMagnetometerCorrection = false;
+    bool useMagnetometerCorrection = true;
     bool newMagData = false;
 };
 
