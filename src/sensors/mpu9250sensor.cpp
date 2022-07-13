@@ -335,7 +335,7 @@ void MPU9250Sensor::startCalibration(int calibrationType) {
         Network::sendRawCalibrationData(calibrationDataAcc, CALIBRATION_TYPE_EXTERNAL_ACCEL, 0);
         Network::sendRawCalibrationData(calibrationDataMag, CALIBRATION_TYPE_EXTERNAL_MAG, 0);
         ledManager.off();
-        delay(250);
+        delay(100);
     }
     m_Logger.debug("Calculating calibration data...");
 
