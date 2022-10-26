@@ -39,15 +39,20 @@ constexpr float gscale = (250. / 32768.0) * (PI / 180.0); //gyro default 250 LSB
 
 #define MAG_CORR_RATIO 0.02
 
+#define ACCEL_SENSITIVITY_2G 16384.0f
+
+// Accel scale conversion steps: LSB/G -> G -> m/s^2
+constexpr float ASCALE_2G = ((32768. / ACCEL_SENSITIVITY_2G) / 32768.) * EARTH_GRAVITY;
+
 void MPU9250Sensor::motionSetup() {
     // initialize device
     imu.initialize(addr);
     if(!imu.testConnection()) {
-        m_Logger.fatal("Can't connect to MPU9250 (0x%02x) at address 0x%02x", imu.getDeviceID(), addr);
+        m_Logger.fatal("Can't connect to MPU9250 (reported device ID 0x%02x) at address 0x%02x", imu.getDeviceID(), addr);
         return;
     }
 
-    m_Logger.info("Connected to MPU9250 (0x%02x) at address 0x%02x", imu.getDeviceID(), addr);
+    m_Logger.info("Connected to MPU9250 (reported device ID 0x%02x) at address 0x%02x", imu.getDeviceID(), addr);
 
     int16_t ax,ay,az;
 
@@ -164,6 +169,25 @@ void MPU9250Sensor::motionLoop() {
         }
     }
 
+#if SEND_ACCELERATION
+    {
+        // dmpGetGravity returns a value that is the percentage of gravity that each axis is experiencing.
+        // dmpGetLinearAccel by default compensates this to be in 4g mode because of that
+        // we need to multiply by the gravity scale by two to convert to 2g mode ()
+        grav.x *= 2;
+        grav.y *= 2;
+        grav.z *= 2;
+
+        this->imu.dmpGetAccel(&this->rawAccel, fifoBuffer);
+        this->imu.dmpGetLinearAccel(&this->rawAccel, &this->rawAccel, &grav);
+
+        // convert acceleration to m/s^2 (implicitly casts to float)
+        this->acceleration[0] = this->rawAccel.x * ASCALE_2G;
+        this->acceleration[1] = this->rawAccel.y * ASCALE_2G;
+        this->acceleration[2] = this->rawAccel.z * ASCALE_2G;
+    }
+#endif
+
     quaternion = correction * quat;
 #else
     unsigned long now = micros();
@@ -171,9 +195,9 @@ void MPU9250Sensor::motionLoop() {
     last = now;
     getMPUScaled();
     
-    #if defined(_MAHONY_H_))
+    #if defined(_MAHONY_H_)
     mahonyQuaternionUpdate(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], deltat * 1.0e-6);
-    #elif defined(_MADGWICK_H_))
+    #elif defined(_MADGWICK_H_)
     madgwickQuaternionUpdate(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], deltat * 1.0e-6);
     #endif
     quaternion.set(-q[2], q[1], q[3], q[0]);
@@ -265,7 +289,7 @@ void MPU9250Sensor::startCalibration(int calibrationType) {
         calibrationDataMag[i * 3 + 2] = -mz;
         Network::sendRawCalibrationData(calibrationDataMag, CALIBRATION_TYPE_EXTERNAL_MAG, 0);
         ledManager.off();
-        delay(100);
+        delay(250);
     }
     m_Logger.debug("Calculating calibration data...");
 
@@ -335,7 +359,7 @@ void MPU9250Sensor::startCalibration(int calibrationType) {
         Network::sendRawCalibrationData(calibrationDataAcc, CALIBRATION_TYPE_EXTERNAL_ACCEL, 0);
         Network::sendRawCalibrationData(calibrationDataMag, CALIBRATION_TYPE_EXTERNAL_MAG, 0);
         ledManager.off();
-        delay(100);
+        delay(250);
     }
     m_Logger.debug("Calculating calibration data...");
 
