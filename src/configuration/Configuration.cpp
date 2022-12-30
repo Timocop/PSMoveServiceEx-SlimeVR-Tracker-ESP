@@ -21,15 +21,7 @@
     THE SOFTWARE.
 */
 
-#ifdef ESP32
-    // #define CONFIG_LITTLEFS_SPIFFS_COMPAT 1
-    // #define CONFIG_LITTLEFS_LFS_YES_TRACE
-    // #define LFS_YES_TRACE
-    #include <LITTLEFS.h>
-    #define LittleFS LITTLEFS
-#else
-    #include <LittleFS.h>
-#endif
+#include <LittleFS.h>
 
 #include "Configuration.h"
 #include "consts.h"
@@ -44,11 +36,22 @@ namespace SlimeVR {
                 return;
             }
 
-#if ESP32
-            LittleFS.begin(true);
-#else
-            LittleFS.begin();
-#endif
+            bool status = LittleFS.begin();
+            if (!status) {
+                this->m_Logger.warn("Could not mount LittleFS, formatting");
+
+                status = LittleFS.format();
+                if (!status) {
+                    this->m_Logger.warn("Could not format LittleFS, aborting");
+                    return;
+                }
+
+                status = LittleFS.begin();
+                if (!status) {
+                    this->m_Logger.error("Could not mount LittleFS, aborting");
+                    return;
+                }
+            }
 
             if (LittleFS.exists("/config.bin")) {
                 m_Logger.trace("Found configuration file");
@@ -189,14 +192,13 @@ namespace SlimeVR {
                     if (f.isDirectory()) {
                         continue;
                     }
-
+                    uint8_t sensorId = strtoul(f.name(), nullptr, 10);
                     m_Logger.trace("Found calibration data file: %s", f.name());
 
                     CalibrationConfig calibrationConfig;
                     f.read((uint8_t*)&calibrationConfig, sizeof(CalibrationConfig));
                     f.close();
 
-                    uint8_t sensorId = strtoul(calibrations.name(), nullptr, 10);
                     m_Logger.debug("Found sensor calibration for %s at index %d", calibrationConfigTypeToString(calibrationConfig.type), sensorId);
 
                     setCalibration(sensorId, calibrationConfig);
