@@ -84,6 +84,8 @@ void BNO080Sensor::motionSetup()
     lastData = millis();
     working = true;
     configured = true;
+    lastCalib = millis();
+    calibStopped = false;
 }
 
 void BNO080Sensor::motionLoop()
@@ -91,6 +93,7 @@ void BNO080Sensor::motionLoop()
     //Look for reports from the IMU
     while (imu.dataAvailable())
     {
+        hadData = true;
 #if ENABLE_INSPECTION
         {
             int16_t rX = imu.getRawGyroX();
@@ -206,6 +209,24 @@ void BNO080Sensor::motionLoop()
         m_Logger.error("Last error: %d, seq: %d, src: %d, err: %d, mod: %d, code: %d",
                 lastError.severity, lastError.error_sequence_number, lastError.error_source, lastError.error, lastError.error_module, lastError.error_code);
     }
+    if(BNO_SELF_CALIBRATION_TIME > 0 && lastCalib + BNO_SELF_CALIBRATION_TIME < millis() && !calibStopped)
+    {
+        calibStopped = true;
+        
+        do
+        {
+            ledManager.on();
+            imu.requestCalibrationStatus();
+            delay(20);
+            imu.getReadings();
+            ledManager.off();
+            delay(20);
+        } while (!imu.calibrationComplete());
+        imu.saveCalibration();
+
+        imu.endCalibration();
+        m_Logger.error("Calibration ended");
+    }
 }
 
 uint8_t BNO080Sensor::getSensorState() {
@@ -252,10 +273,17 @@ void BNO080Sensor::sendData()
 
 void BNO080Sensor::startCalibration(int calibrationType)
 {
-    // TODO It only calibrates gyro, it should have multiple calibration modes, and check calibration status in motionLoop()
     ledManager.pattern(20, 20, 10);
     ledManager.blink(2000);
+#if USE_6_AXIS
     imu.calibrateGyro();
+#else
+    imu.calibrateAll();
+#endif
+
+    // Wait for quick gyro calibration before saving
+    delay(5000);
+
     do
     {
         ledManager.on();
@@ -266,4 +294,6 @@ void BNO080Sensor::startCalibration(int calibrationType)
         delay(20);
     } while (!imu.calibrationComplete());
     imu.saveCalibration();
+
+    lastCalib = millis();
 }
