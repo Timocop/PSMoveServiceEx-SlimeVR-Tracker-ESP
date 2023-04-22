@@ -26,7 +26,7 @@
 #include "logging/Level.h"
 
 #define IMU_MPU6050_RUNTIME_CALIBRATION // Comment to revert to startup/traditional-calibration
-#define BNO_USE_ARVR_STABILIZATION true // Set to false to disable stabilization for BNO085+ IMUs
+#define BNO_USE_ARVR_STABILIZATION false // Set to false to disable stabilization for BNO085+ IMUs
 #define BNO_USE_MAGNETOMETER_CORRECTION false // Set to true to enable magnetometer correction for BNO08x IMUs. Only works with USE_6_AXIS set to true
 #define BNO_SELF_CALIBRATION_TIME 30000 // Set value to non-zero (in milliseconds) if BNO8x should stop self-calibration in time
 #define USE_6_AXIS false // uses 9 DoF (with mag) if false (only for ICM-20948 and BNO0xx currently)
