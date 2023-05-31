@@ -26,6 +26,10 @@
 #include "utils.h"
 #include "GlobalVars.h"
 
+#define CALIB_MODE_INIT 0
+#define CALIB_MODE_WAIT_GRAVITY 1
+#define CALIB_MODE_DONE 2
+
 void BNO080Sensor::motionSetup()
 {
 #ifdef DEBUG_SENSOR
@@ -75,6 +79,9 @@ void BNO080Sensor::motionSetup()
     imu.enableTapDetector(100);
     imu.enableStabilityClassifier(100);
 
+    //For calibration flip detection
+    imu.enableAccelerometer(10);
+
 #if ENABLE_INSPECTION
     imu.enableRawGyro(10);
     imu.enableRawAccelerometer(10);
@@ -85,7 +92,8 @@ void BNO080Sensor::motionSetup()
     lastData = millis();
     working = true;
     configured = true;
-    calibrationCheck = false;
+    calibrationMode = CALIB_MODE_INIT;
+    lastcalibrationMode = millis();
 }
 
 void BNO080Sensor::motionLoop()
@@ -94,34 +102,6 @@ void BNO080Sensor::motionLoop()
     while (imu.dataAvailable())
     {
         hadData = true;
-
-        if(!calibrationCheck)
-        {
-            //calibrationCheck = true;
-
-            float ax,ay,az;
-            uint8_t aa;
-
-            // turn on while flip back to calibrate. then, flip again after 5 seconds.
-            // TODO: Move calibration invoke after calibrate button on slimeVR server available
-            imu.getAccel(ax, ay, az, aa);
-            float g_az = (float)az / 16384; // For 2G sensitivity
-            if(g_az < -0.75f) {
-                ledManager.on();
-                m_Logger.info("Flip front to confirm start calibration");
-                delay(5000);
-                ledManager.off();
-
-                imu.getAccel(ax, ay, az, aa);
-                g_az = (float)az / 16384;
-                if(g_az > 0.75f) {
-                    m_Logger.debug("Starting calibration...");
-                    startCalibration(0);
-                }
-            }
-            m_Logger.info("Accel: %f,%f,%f", ax, ay, az);
-        }
-
 
 #if ENABLE_INSPECTION
         {
@@ -146,6 +126,44 @@ void BNO080Sensor::motionLoop()
 
         lastReset = 0;
         lastData = millis();
+
+        switch(calibrationMode) 
+        {
+            case CALIB_MODE_INIT: 
+            {
+                calibrationMode = CALIB_MODE_DONE;
+
+                float g_az = (imu.getAccelZ() / EARTH_GRAVITY);
+                if(g_az < -0.75f) {
+                    m_Logger.info("Flip front to confirm start calibration");
+
+                    calibrationMode = CALIB_MODE_WAIT_GRAVITY;
+                    lastcalibrationMode = millis();
+                }
+                break;
+            }
+            case CALIB_MODE_WAIT_GRAVITY:
+            {
+                ledManager.on();
+
+                if(lastcalibrationMode + 5000 < millis())
+                {
+                    ledManager.off();
+                    calibrationMode = CALIB_MODE_DONE;
+
+                    float g_az = (imu.getAccelZ() / EARTH_GRAVITY);
+                    if(g_az > 0.75f) {
+                        m_Logger.debug("Starting calibration...");
+
+                        startCalibration(0);
+                    }
+                }
+                break;
+            }
+        }
+
+        if(calibrationMode != CALIB_MODE_DONE)
+            return;
 
 #if USE_6_AXIS
         if (imu.hasNewGameQuat())
@@ -282,8 +300,7 @@ void BNO080Sensor::sendData()
 
 void BNO080Sensor::startCalibration(int calibrationType)
 {
-    ledManager.pattern(20, 20, 10);
-    ledManager.blink(2000);
+    ledManager.pattern(15, 300, 3000/310);
 
     // Start calibration when device is not in motion
     // 0 - Unknown
@@ -299,7 +316,7 @@ void BNO080Sensor::startCalibration(int calibrationType)
         imu.getReadings();
         ledManager.off();
         delay(20);
-    } while (imu.getStabilityClassifier() == 0);
+    } while (imu.getStabilityClassifier() != 1);
     
     // Start calibration
 #if USE_6_AXIS
@@ -313,7 +330,7 @@ void BNO080Sensor::startCalibration(int calibrationType)
 
     saveCalibration();
 
-    ledManager.pattern(20, 20, 10);
+    ledManager.pattern(15, 300, 3000/310);
 
     // Wait for magnetometer/accelerometer calibration
     if(BNO_SELF_CALIBRATION_TIME > 0)
