@@ -85,11 +85,7 @@ void BNO080Sensor::motionSetup()
     lastData = millis();
     working = true;
     configured = true;
-    lastCalib = millis();
-    calibStopped = false;
-
-    // startCalibration() executes too soon before parameters have set
-    initCalibration();
+    calibrationCheck = false;
 }
 
 void BNO080Sensor::motionLoop()
@@ -98,6 +94,35 @@ void BNO080Sensor::motionLoop()
     while (imu.dataAvailable())
     {
         hadData = true;
+
+        if(!calibrationCheck)
+        {
+            //calibrationCheck = true;
+
+            float ax,ay,az;
+            uint8_t aa;
+
+            // turn on while flip back to calibrate. then, flip again after 5 seconds.
+            // TODO: Move calibration invoke after calibrate button on slimeVR server available
+            imu.getAccel(ax, ay, az, aa);
+            float g_az = (float)az / 16384; // For 2G sensitivity
+            if(g_az < -0.75f) {
+                ledManager.on();
+                m_Logger.info("Flip front to confirm start calibration");
+                delay(5000);
+                ledManager.off();
+
+                imu.getAccel(ax, ay, az, aa);
+                g_az = (float)az / 16384;
+                if(g_az > 0.75f) {
+                    m_Logger.debug("Starting calibration...");
+                    startCalibration(0);
+                }
+            }
+            m_Logger.info("Accel: %f,%f,%f", ax, ay, az);
+        }
+
+
 #if ENABLE_INSPECTION
         {
             int16_t rX = imu.getRawGyroX();
@@ -213,19 +238,6 @@ void BNO080Sensor::motionLoop()
         m_Logger.error("Last error: %d, seq: %d, src: %d, err: %d, mod: %d, code: %d",
                 lastError.severity, lastError.error_sequence_number, lastError.error_source, lastError.error, lastError.error_module, lastError.error_code);
     }
-
-    // $TODO only save good accuracy
-    if(BNO_SELF_CALIBRATION_TIME > 0 && lastCalib + BNO_SELF_CALIBRATION_TIME < millis() && !calibStopped)
-    {
-        calibStopped = true;
-        
-        saveCalibration();
-
-        imu.endCalibration();
-
-        m_Logger.info("Calibration ended");
-        m_Logger.info("Calibration accuracy: %d", calibrationAccuracy);
-    }
 }
 
 uint8_t BNO080Sensor::getSensorState() {
@@ -269,9 +281,6 @@ void BNO080Sensor::sendData()
 }
 
 void BNO080Sensor::startCalibration(int calibrationType)
-{}
-
-void BNO080Sensor::initCalibration()
 {
     ledManager.pattern(20, 20, 10);
     ledManager.blink(2000);
@@ -290,12 +299,6 @@ void BNO080Sensor::initCalibration()
         imu.getReadings();
         ledManager.off();
         delay(20);
-
-        if(imu.getStabilityClassifier() == 4)
-        {
-            calibStopped = true;
-            return;
-        }
     } while (imu.getStabilityClassifier() == 0);
     
     // Start calibration
@@ -310,7 +313,17 @@ void BNO080Sensor::initCalibration()
 
     saveCalibration();
 
-    lastCalib = millis();
+    ledManager.pattern(20, 20, 10);
+
+    // Wait for magnetometer/accelerometer calibration
+    if(BNO_SELF_CALIBRATION_TIME > 0)
+    {
+        ledManager.blink(BNO_SELF_CALIBRATION_TIME);
+
+        saveCalibration();
+
+        imu.endCalibration();
+    }
 }
 
 void BNO080Sensor::saveCalibration()
