@@ -1,8 +1,49 @@
 #include "madgwick.h"
 
-volatile float beta = 0.1f;
+#define BETA_DETAULT 0.1f
+#define BETA_STABLE_DETAULT 0.5f
+#define STABILIZATION_GYRO_MAX_DEG 1.0f
+#define STABILIZATION_GYRO_MIN_DEG 0.1f
+
+void madgwickQuaternionUpdateStable(float q[4], float ax, float ay, float az, float gx, float gy, float gz, float deltat)
+{
+	float gyro_sq = (float) sqrt(gx * gx + gy * gy + gz * gz) * deltat;
+	gyro_sq = (float) (gyro_sq * (180.f / PI));
+
+	float beta_multi = ((gyro_sq - STABILIZATION_GYRO_MIN_DEG) / STABILIZATION_GYRO_MAX_DEG);
+	if (beta_multi < 0.0f)
+		beta_multi = 0.f;
+	if (beta_multi > 1.0f)
+		beta_multi = 1.f;
+
+	madgwickQuaternionUpdate(q, ax, ay, az, gx, gy, gz, deltat, BETA_STABLE_DETAULT * beta_multi);
+}
+
+void madgwickQuaternionUpdateStable(float q[4], float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz, float deltat)
+{
+	float gyro_sq = (float) sqrt(gx * gx + gy * gy + gz * gz) * deltat;
+	gyro_sq = (float) (gyro_sq * (180.f / PI));
+
+	float beta_multi = ((gyro_sq - STABILIZATION_GYRO_MIN_DEG) / STABILIZATION_GYRO_MAX_DEG);
+	if (beta_multi < 0.0f)
+		beta_multi = 0.f;
+	if (beta_multi > 1.0f)
+		beta_multi = 1.f;
+
+	madgwickQuaternionUpdate(q, ax, ay, az, gx, gy, gz, mx, my, mz, deltat, BETA_STABLE_DETAULT * beta_multi);
+}
 
 void madgwickQuaternionUpdate(float q[4], float ax, float ay, float az, float gx, float gy, float gz, float deltat)
+{
+	madgwickQuaternionUpdate(q, ax, ay, az, gx, gy, gz, deltat, BETA_DETAULT);
+}
+
+void madgwickQuaternionUpdate(float q[4], float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz, float deltat)
+{
+	madgwickQuaternionUpdate(q, ax, ay, az, gx, gy, gz, mx, my, mz, deltat, BETA_DETAULT);
+}
+
+void madgwickQuaternionUpdate(float q[4], float ax, float ay, float az, float gx, float gy, float gz, float deltat, float beta)
 {
     float recipNorm;
 	float s0, s1, s2, s3;
@@ -70,7 +111,7 @@ void madgwickQuaternionUpdate(float q[4], float ax, float ay, float az, float gx
 	q[2] *= recipNorm;
 	q[3] *= recipNorm;
 }
-void madgwickQuaternionUpdate(float q[4], float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz, float deltat)
+void madgwickQuaternionUpdate(float q[4], float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz, float deltat, float beta)
 {
     float recipNorm;
 	float s0, s1, s2, s3;

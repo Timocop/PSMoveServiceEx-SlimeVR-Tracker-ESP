@@ -193,7 +193,7 @@ void BNO080Sensor::motionLoop()
             imu.getGyro(Gxyz[0], Gxyz[1], Gxyz[2], a);
             imu.getAccel(Axyz[0], Axyz[1], Axyz[2], a);
 
-            madgwickQuaternionUpdate(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], (millis() - lastMadgwick) / 1000.f);
+            madgwickQuaternionUpdateStable(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], (millis() - lastMadgwick) / 1000.f);
             lastMadgwick = millis();
 
             quaternion.set(-q[2], q[1], q[3], q[0]);
@@ -203,7 +203,7 @@ void BNO080Sensor::motionLoop()
             imu.getAccel(Axyz[0], Axyz[1], Axyz[2], a);
             imu.getMag(Mxyz[0], Mxyz[1], Mxyz[2], a);
 
-            madgwickQuaternionUpdate(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], (millis() - lastMadgwick) / 1000.f);
+            madgwickQuaternionUpdateStable(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], (millis() - lastMadgwick) / 1000.f);
             lastMadgwick = millis();
 
             quaternion.set(-q[2], q[1], q[3], q[0]);
