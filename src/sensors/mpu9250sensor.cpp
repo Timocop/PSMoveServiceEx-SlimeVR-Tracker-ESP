@@ -28,7 +28,7 @@
 #include "magneto1.4.h"
 #include "GlobalVars.h"
 // #include "mahony.h"
-// #include "madgwick.h"
+#include "madgwick.h"
 #if not (defined(_MAHONY_H_) || defined(_MADGWICK_H_))
 #include "dmpmag.h"
 #endif
@@ -38,6 +38,8 @@ constexpr float gscale = (250. / 32768.0) * (PI / 180.0); //gyro default 250 LSB
 //#endif
 
 #define MAG_CORR_RATIO 0.02
+
+#define MADGWICK_UPDATE_RATE_MS 5.f
 
 #define ACCEL_SENSITIVITY_2G 16384.0f
 
@@ -128,16 +130,14 @@ void MPU9250Sensor::motionSetup() {
     imu.setZGyroFIFOEnabled(true);
     imu.setSlave0FIFOEnabled(true);
 
-    // TODO: set a rate we prefer instead of getting the current rate from the device.
-    deltat = 1.0 / 1000.0 * (1 + imu.getRate());
-    //imu.setRate(blah);
-
     imu.resetFIFO();
     imu.setFIFOEnabled(true);
 
     working = true;
     configured = true;
 #endif
+
+    lastMadgwick = millis();
 }
 
 void MPU9250Sensor::motionLoop() {
@@ -222,11 +222,17 @@ void MPU9250Sensor::motionLoop() {
         // TODO: monitor remaining_samples to ensure that the number is going down, not up.
         // remaining_samples
 
+        if ((millis() - lastMadgwick) > MADGWICK_UPDATE_RATE_MS)
+        {
         #if defined(_MAHONY_H_)
-        mahonyQuaternionUpdate(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], deltat * 1.0e-6);
+            mahonyQuaternionUpdate(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], (millis() - lastMadgwick) / 1000.f);
         #elif defined(_MADGWICK_H_)
-        madgwickQuaternionUpdateStable(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], deltat * 1.0e-6);
+            
+            madgwickQuaternionUpdateStable(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], (millis() - lastMadgwick) / 1000.f);
         #endif
+            
+            lastMadgwick = millis();
+        }
     }
     
     quaternion.set(-q[2], q[1], q[3], q[0]);

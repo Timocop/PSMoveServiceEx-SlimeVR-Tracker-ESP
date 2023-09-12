@@ -54,7 +54,7 @@ private:
     VectorInt16 rawAccel{};
     Quat correction{0, 0, 0, 0};
     // Loop timing globals
-    float deltat = 0;                // sample time in seconds
+    unsigned long lastMadgwick = 0;
 
     SlimeVR::Configuration::MPU9250CalibrationConfig m_Calibration;
 
