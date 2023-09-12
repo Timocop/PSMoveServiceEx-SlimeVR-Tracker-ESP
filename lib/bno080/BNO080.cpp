@@ -340,6 +340,7 @@ uint16_t BNO080::parseInputReport(void)
 	}
 	else if (shtpData[5] == SENSOR_REPORTID_GYROSCOPE)
 	{
+		hasNewGyro_ = true;
 		gyroAccuracy = status;
 		rawGyroX = data1;
 		rawGyroY = data2;
@@ -347,6 +348,7 @@ uint16_t BNO080::parseInputReport(void)
 	}
 	else if (shtpData[5] == SENSOR_REPORTID_MAGNETIC_FIELD)
 	{
+		hasNewMag_ = true;
 		magAccuracy = status;
 		rawMagX = data1;
 		rawMagY = data2;
@@ -580,6 +582,14 @@ bool BNO080::hasNewAccel() {
 	return hasNewAccel_;
 }
 
+bool BNO080::hasNewGyro() {
+	return hasNewGyro_;
+}
+
+bool BNO080::hasNewMag() {
+	return hasNewMag_;
+}
+
 //Return the rotation vector quaternion I
 float BNO080::getQuatI()
 {
@@ -706,6 +716,7 @@ void BNO080::getGyro(float &x, float &y, float &z, uint8_t &accuracy)
 	y = qToFloat(rawGyroY, gyro_Q1);
 	z = qToFloat(rawGyroZ, gyro_Q1);
 	accuracy = gyroAccuracy;
+	hasNewGyro_ = false;
 }
 
 //Return the gyro component
@@ -743,6 +754,7 @@ void BNO080::getMag(float &x, float &y, float &z, uint8_t &accuracy)
 	y = qToFloat(rawMagY, magnetometer_Q1);
 	z = qToFloat(rawMagZ, magnetometer_Q1);
 	accuracy = magAccuracy;
+	hasNewMag_ = false;
 }
 
 //Return the magnetometer component

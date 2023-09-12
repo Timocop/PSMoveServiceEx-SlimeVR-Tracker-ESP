@@ -215,6 +215,8 @@ public:
 	float getAccelZ();
 	uint8_t getAccelAccuracy();
 	bool hasNewAccel();
+	bool hasNewGyro();
+	bool hasNewMag();
 
 	void getLinAccel(float &x, float &y, float &z, uint8_t &accuracy);
 	float getLinAccelX();
@@ -327,7 +329,7 @@ private:
 	uint16_t rawQuatI, rawQuatJ, rawQuatK, rawQuatReal, rawQuatRadianAccuracy, quatAccuracy;
 	uint16_t rawGameQuatI, rawGameQuatJ, rawGameQuatK, rawGameQuatReal, quatGameAccuracy;
 	uint16_t rawMagQuatI, rawMagQuatJ, rawMagQuatK, rawMagQuatReal, rawMagQuatRadianAccuracy, quatMagAccuracy;
-	bool hasNewQuaternion, hasNewGameQuaternion, hasNewMagQuaternion, hasNewAccel_;
+	bool hasNewQuaternion, hasNewGameQuaternion, hasNewMagQuaternion, hasNewAccel_, hasNewGyro_, hasNewMag_;
 	uint16_t rawFastGyroX, rawFastGyroY, rawFastGyroZ;
 	uint8_t tapDetector;
 	bool hasNewTap;

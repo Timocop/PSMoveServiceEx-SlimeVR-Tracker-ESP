@@ -64,6 +64,11 @@ private:
     uint8_t magCalibrationAccuracy = 0;
     float magneticAccuracyEstimate = 999;
     bool newMagData = false;
+    unsigned long lastMadgwick = 0;
+    float q[4]{1.0f, 0.0f, 0.0f, 0.0f}; // for raw filter
+    float Axyz[3]{};
+    float Gxyz[3]{};
+    float Mxyz[3]{};
 };
 
 #endif

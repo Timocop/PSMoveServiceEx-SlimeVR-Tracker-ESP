@@ -26,9 +26,15 @@
 #include "utils.h"
 #include "GlobalVars.h"
 
+#if BNO_USE_MADGWICK
+    #include "madgwick.h"
+#endif
+
 #define CALIB_MODE_INIT 0
 #define CALIB_MODE_WAIT_GRAVITY 1
 #define CALIB_MODE_DONE 2
+
+#define MADGWICK_UPDATE_RATE_MS 5.f
 
 void BNO080Sensor::motionSetup()
 {
@@ -58,23 +64,35 @@ void BNO080Sensor::motionSetup()
 
     imu.enableLinearAccelerometer(10);
 
-#if USE_6_AXIS
-    #if (IMU == IMU_BNO085 || IMU == IMU_BNO086) && BNO_USE_ARVR_STABILIZATION
-    imu.enableARVRStabilizedGameRotationVector(10);
+#if BNO_USE_MADGWICK
+    #if USE_6_AXIS
+        imu.enableGyro(10);
+        imu.enableAccelerometer(10);
     #else
-    imu.enableGameRotationVector(10);
-    #endif
-
-    #if BNO_USE_MAGNETOMETER_CORRECTION
-    imu.enableRotationVector(1000);
+        imu.enableGyro(10);
+        imu.enableAccelerometer(10);
+        imu.enableMagnetometer(10);
     #endif
 #else
-    #if (IMU == IMU_BNO085 || IMU == IMU_BNO086) && BNO_USE_ARVR_STABILIZATION
-    imu.enableARVRStabilizedRotationVector(10);
+    #if USE_6_AXIS
+        #if (IMU == IMU_BNO085 || IMU == IMU_BNO086) && BNO_USE_ARVR_STABILIZATION
+        imu.enableARVRStabilizedGameRotationVector(10);
+        #else
+        imu.enableGameRotationVector(10);
+        #endif
+
+        #if BNO_USE_MAGNETOMETER_CORRECTION
+        imu.enableRotationVector(1000);
+        #endif
     #else
-    imu.enableRotationVector(10);
+        #if (IMU == IMU_BNO085 || IMU == IMU_BNO086) && BNO_USE_ARVR_STABILIZATION
+        imu.enableARVRStabilizedRotationVector(10);
+        #else
+        imu.enableRotationVector(10);
+        #endif
     #endif
 #endif
+
 
     imu.enableTapDetector(100);
     imu.enableStabilityClassifier(100);
@@ -94,6 +112,8 @@ void BNO080Sensor::motionSetup()
     configured = true;
     calibrationMode = CALIB_MODE_INIT;
     lastcalibrationMode = millis();
+    lastMadgwick = millis();
+    
 }
 
 void BNO080Sensor::motionLoop()
@@ -165,11 +185,42 @@ void BNO080Sensor::motionLoop()
         if(calibrationMode != CALIB_MODE_DONE)
             return;
 
-#if USE_6_AXIS
-        if (imu.hasNewGameQuat())
+#if BNO_USE_MADGWICK
+        if (imu.hasNewGyro() && (millis() - lastMadgwick) > MADGWICK_UPDATE_RATE_MS)
         {
-            imu.getGameQuat(quaternion.x, quaternion.y, quaternion.z, quaternion.w, calibrationAccuracy);
-            quaternion *= sensorOffset;
+    #if USE_6_AXIS
+  uint8_t a;
+            imu.getGyro(Gxyz[0], Gxyz[1], Gxyz[2], a);
+            imu.getAccel(Axyz[0], Axyz[1], Axyz[2], a);
+
+            madgwickQuaternionUpdate(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], (millis() - lastMadgwick) / 1000.f);
+            lastMadgwick = millis();
+
+            quaternion.set(-q[2], q[1], q[3], q[0]);
+    #else
+            uint8_t a;
+            imu.getGyro(Gxyz[0], Gxyz[1], Gxyz[2], a);
+            imu.getAccel(Axyz[0], Axyz[1], Axyz[2], a);
+            imu.getMag(Mxyz[0], Mxyz[1], Mxyz[2], a);
+
+            madgwickQuaternionUpdate(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], (millis() - lastMadgwick) / 1000.f);
+            lastMadgwick = millis();
+
+            quaternion.set(-q[2], q[1], q[3], q[0]);
+    #endif
+            if (!OPTIMIZE_UPDATES || !lastQuatSent.equalsWithEpsilon(quaternion))
+            {
+                newData = true;
+                lastQuatSent = quaternion;
+            }
+        }
+
+#else // BNO_USE_MADGWICK
+#if USE_6_AXIS
+    if (imu.hasNewGameQuat())
+    {
+        imu.getGameQuat(quaternion.x, quaternion.y, quaternion.z, quaternion.w, calibrationAccuracy);
+        quaternion *= sensorOffset;
     #if SEND_ACCELERATION
             {
                 uint8_t acc;
@@ -183,12 +234,12 @@ void BNO080Sensor::motionLoop()
             }
     #endif // ENABLE_INSPECTION
 
-            if (!OPTIMIZE_UPDATES || !lastQuatSent.equalsWithEpsilon(quaternion))
-            {
-                newData = true;
-                lastQuatSent = quaternion;
-            }
+        if (!OPTIMIZE_UPDATES || !lastQuatSent.equalsWithEpsilon(quaternion))
+        {
+            newData = true;
+            lastQuatSent = quaternion;
         }
+    }
 
     #if BNO_USE_MAGNETOMETER_CORRECTION
         if (imu.hasNewMagQuat())
@@ -207,25 +258,26 @@ void BNO080Sensor::motionLoop()
     #endif // BNO_USE_MAGNETOMETER_CORRECTION
 #else // USE_6_AXIS
 
-        if (imu.hasNewQuat())
+    if (imu.hasNewQuat())
+    {
+        imu.getQuat(quaternion.x, quaternion.y, quaternion.z, quaternion.w, magneticAccuracyEstimate, calibrationAccuracy);
+        quaternion *= sensorOffset;
+
+#if ENABLE_INSPECTION
         {
-            imu.getQuat(quaternion.x, quaternion.y, quaternion.z, quaternion.w, magneticAccuracyEstimate, calibrationAccuracy);
-            quaternion *= sensorOffset;
-
-    #if ENABLE_INSPECTION
-            {
-                Network::sendInspectionFusedIMUData(sensorId, quaternion);
-            }
-    #endif // ENABLE_INSPECTION
-
-            if (!OPTIMIZE_UPDATES || !lastQuatSent.equalsWithEpsilon(quaternion))
-            {
-                newData = true;
-                lastQuatSent = quaternion;
-            }
+            Network::sendInspectionFusedIMUData(sensorId, quaternion);
         }
+#endif // ENABLE_INSPECTION
+
+        if (!OPTIMIZE_UPDATES || !lastQuatSent.equalsWithEpsilon(quaternion))
+        {
+            newData = true;
+            lastQuatSent = quaternion;
+        }
+    }
 #endif // USE_6_AXIS
 
+#endif // BNO_USE_MADGWICK
         if (imu.getTapDetected())
         {
             tap = imu.getTapDetector();
