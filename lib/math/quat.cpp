@@ -31,6 +31,25 @@
 #include "quat.h"
 #include "basis.h"
 
+
+float Quat::angle_to(const Quat &p_to) const {
+	const Quat p_from = *this;
+
+	Quat p_to_norm = p_to.normalized();
+	Quat p_from_norm = p_from.normalized();
+
+	float dot = 
+		p_from_norm.w * p_to_norm.w + 
+		p_from_norm.x * p_to_norm.x + 
+		p_from_norm.y * p_to_norm.y + 
+		p_from_norm.z * p_to_norm.z;
+
+	float mag_to = p_to_norm.length_squared();
+	float mag_from = p_from_norm.length_squared();
+
+	return acosf(dot / (mag_to / mag_from));
+}
+
 // set_euler_xyz expects a vector containing the Euler angles in the format
 // (ax,ay,az), where ax is the angle of rotation around x axis,
 // and similar for other axes.

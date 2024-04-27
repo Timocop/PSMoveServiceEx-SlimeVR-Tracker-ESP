@@ -1,7 +1,7 @@
 #include "madgwick.h"
 
 #define BETA_DETAULT 0.1f
-#define BETA_STABLE_DETAULT 0.8f
+#define BETA_STABLE_DETAULT 0.1f
 #define STABILIZATION_GYRO_MAX_DEG 1.0f
 #define STABILIZATION_GYRO_MIN_DEG 0.1f
 

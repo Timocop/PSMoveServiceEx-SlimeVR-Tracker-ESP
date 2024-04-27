@@ -36,6 +36,10 @@
 
 #define MADGWICK_UPDATE_RATE_MS 5.f
 
+#define SMART_ANGLE_DIFF 10.0f
+#define SMART_ACCEL_STABLE 0.9f
+#define SMART_CORRECT_TIME_MS 2000.f
+
 void BNO080Sensor::motionSetup()
 {
 #ifdef DEBUG_SENSOR
@@ -186,28 +190,47 @@ void BNO080Sensor::motionLoop()
             return;
 
 #if BNO_USE_MADGWICK
-        if (imu.hasNewGyro() && (millis() - lastMadgwick) > MADGWICK_UPDATE_RATE_MS)
+        if (imu.hasNewGyro())
         {
     #if USE_6_AXIS
-  uint8_t a;
+            // $HACK For some reason the bias is too low and gyro lacks behind a bit (adafruit).
+            // Probably has something to do with the execution speed.
+            float multi_bias = 1.0275f;
+
+            uint8_t a;
             imu.getGyro(Gxyz[0], Gxyz[1], Gxyz[2], a);
             imu.getAccel(Axyz[0], Axyz[1], Axyz[2], a);
-
-            madgwickQuaternionUpdateStable(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], (millis() - lastMadgwick) / 1000.f);
-            lastMadgwick = millis();
-
-            quaternion.set(-q[2], q[1], q[3], q[0]);
     #else
+            // $HACK For some reason the bias is too low and gyro lacks behind a bit (adafruit).
+            // Probably has something to do with the execution speed.
+            float multi_bias = 1.1f;
+            
             uint8_t a;
             imu.getGyro(Gxyz[0], Gxyz[1], Gxyz[2], a);
             imu.getAccel(Axyz[0], Axyz[1], Axyz[2], a);
             imu.getMag(Mxyz[0], Mxyz[1], Mxyz[2], a);
-
-            madgwickQuaternionUpdateStable(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], (millis() - lastMadgwick) / 1000.f);
-            lastMadgwick = millis();
-
-            quaternion.set(-q[2], q[1], q[3], q[0]);
     #endif
+
+            avgGxyz[0] += Gxyz[0] * multi_bias;
+            avgGxyz[1] += Gxyz[1] * multi_bias;
+            avgGxyz[2] += Gxyz[2] * multi_bias;
+            avgGyroSamples++;
+        }
+
+        if ((millis() - lastMadgwick) > MADGWICK_UPDATE_RATE_MS && avgGyroSamples > 0)
+        {
+            float newGxyz[3];
+            newGxyz[0] = avgGxyz[0] / avgGyroSamples;
+            newGxyz[1] = avgGxyz[1] / avgGyroSamples;
+            newGxyz[2] = avgGxyz[2] / avgGyroSamples;
+
+            avgGxyz[0] = 0.f;
+            avgGxyz[1] = 0.f;
+            avgGxyz[2] = 0.f;
+            avgGyroSamples = 0;
+
+            doMadgwickUpdate(Axyz, newGxyz, Mxyz);
+
             if (!OPTIMIZE_UPDATES || !lastQuatSent.equalsWithEpsilon(quaternion))
             {
                 newData = true;
@@ -407,4 +430,53 @@ void BNO080Sensor::saveCalibration()
         delay(20);
     } while (!imu.calibrationComplete());
     imu.saveCalibration();
+}
+
+void BNO080Sensor::doMadgwickUpdate(float Axyz[3], float Gxyz[3], float Mxyz[3]) {
+    float lastDelta = (millis() - lastMadgwick) / 1000.f;
+
+    //m_Logger.debug("lastDelta : %f", lastDelta);
+
+#if USE_6_AXIS
+    madgwickQuaternionUpdateStable(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], lastDelta);
+#else
+    madgwickQuaternionUpdateStable(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], lastDelta); //main
+    madgwickQuaternionUpdate(s_q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], lastDelta, 0.9f); //smart
+#endif
+    lastMadgwick = millis();
+
+#if !USE_6_AXIS
+    Quat quat;
+    Quat quatSmart;
+    quat.set(-q[2], q[1], q[3], q[0]);
+    quatSmart.set(-s_q[2], s_q[1], s_q[3], s_q[0]);
+
+    // Get angle in degrees
+    const float angleDiff = fabsf(quatSmart.angle_to(quat) * (180.f / Math_PI));
+    const float accel_q = sqrtf(Axyz[0] * Axyz[0] + Axyz[1] * Axyz[1] + Axyz[2] * Axyz[2]) / EARTH_GRAVITY;
+    const float mag_q = sqrtf(Mxyz[0] * Mxyz[0] + Mxyz[1] * Mxyz[1] + Mxyz[2] * Mxyz[2]);
+    
+    //m_Logger.debug("angleDiff : %f | accel_q : %f  | mag_q : %f | lastSmart : %i", angleDiff, accel_q, mag_q, lastSmart);
+
+    // Smart reset when angle different is too big and accelerator is stable
+    if ((angleDiff > SMART_ANGLE_DIFF) && (accel_q > SMART_ACCEL_STABLE && accel_q < 1.f + (1.f - SMART_ACCEL_STABLE))) {
+        if (lastSmart == 0) {
+            lastSmart = millis();
+        }
+        
+        if ((millis() - lastSmart) > SMART_CORRECT_TIME_MS) {
+            // Set smart quat to main quat
+            q[0] = s_q[0];
+            q[1] = s_q[1];
+            q[2] = s_q[2];
+
+            lastSmart = 0;
+        }
+    }
+    else {
+        lastSmart = 0;
+    } 
+#endif
+
+    quaternion.set(-q[2], q[1], q[3], q[0]);
 }

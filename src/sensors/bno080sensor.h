@@ -46,6 +46,8 @@ public:
     void initCalibration();
     void saveCalibration();
 
+    void doMadgwickUpdate(float Axyz[3], float Gxyz[3], float Mxyz[3]);
+
 private:
     BNO080 imu{};
 
@@ -66,9 +68,14 @@ private:
     bool newMagData = false;
     unsigned long lastMadgwick = 0;
     float q[4]{1.0f, 0.0f, 0.0f, 0.0f}; // for raw filter
+    float s_q[4]{1.0f, 0.0f, 0.0f, 0.0f}; // for smart filter
     float Axyz[3]{};
     float Gxyz[3]{};
     float Mxyz[3]{};
+    float avgGxyz[3]{};
+    float avgGyroSamples = 0;
+
+    unsigned long lastSmart = 0;
 };
 
 #endif

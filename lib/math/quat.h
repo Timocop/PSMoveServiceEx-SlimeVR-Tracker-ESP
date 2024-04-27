@@ -51,6 +51,9 @@ public:
 		float components[4] = { 0, 0, 0, 1.0 };
 	};
 
+	
+	float angle_to(const Quat &p_to) const;
+
 	inline float& operator[](int idx) {
 		return components[idx];
 	}
