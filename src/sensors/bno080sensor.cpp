@@ -432,6 +432,7 @@ void BNO080Sensor::saveCalibration()
     imu.saveCalibration();
 }
 
+#if BNO_USE_MADGWICK
 void BNO080Sensor::doMadgwickUpdate(float Axyz[3], float Gxyz[3], float Mxyz[3]) {
     float lastDelta = (millis() - lastMadgwick) / 1000.f;
 
@@ -480,3 +481,4 @@ void BNO080Sensor::doMadgwickUpdate(float Axyz[3], float Gxyz[3], float Mxyz[3])
 
     quaternion.set(-q[2], q[1], q[3], q[0]);
 }
+#endif
