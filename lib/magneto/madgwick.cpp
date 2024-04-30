@@ -2,7 +2,7 @@
 
 #define BETA_DETAULT 0.1f
 #define BETA_STABLE_DETAULT 0.1f
-#define STABILIZATION_GYRO_MAX_DEG 1.0f
+#define STABILIZATION_GYRO_MAX_DEG 0.25f
 #define STABILIZATION_GYRO_MIN_DEG 0.1f
 
 void madgwickQuaternionUpdateStable(float q[4], float ax, float ay, float az, float gx, float gy, float gz, float deltat)

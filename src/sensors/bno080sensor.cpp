@@ -36,9 +36,10 @@
 
 #define MADGWICK_UPDATE_RATE_MS 5.f
 
-#define SMART_ANGLE_DIFF 10.0f
+#define SMART_ANGLE_DIFF 25.0f / 2.f
 #define SMART_ACCEL_STABLE 0.9f
-#define SMART_CORRECT_TIME_MS 2000.f
+#define SMART_CORRECT_TIME_MS 1000.f
+#define SMART_BETA 0.9f
 
 void BNO080Sensor::motionSetup()
 {
@@ -436,17 +437,19 @@ void BNO080Sensor::saveCalibration()
 void BNO080Sensor::doMadgwickUpdate(float Axyz[3], float Gxyz[3], float Mxyz[3]) {
     float lastDelta = (millis() - lastMadgwick) / 1000.f;
 
+#define USE_SMART true
+
     //m_Logger.debug("lastDelta : %f", lastDelta);
 
 #if USE_6_AXIS
     madgwickQuaternionUpdateStable(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], lastDelta);
 #else
     madgwickQuaternionUpdateStable(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], lastDelta); //main
-    madgwickQuaternionUpdate(s_q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], lastDelta, 0.9f); //smart
+    madgwickQuaternionUpdate(s_q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], lastDelta, SMART_BETA); //smart
 #endif
     lastMadgwick = millis();
 
-#if !USE_6_AXIS
+#if !USE_6_AXIS && USE_SMART
     Quat quat;
     Quat quatSmart;
     quat.set(-q[2], q[1], q[3], q[0]);
@@ -456,8 +459,9 @@ void BNO080Sensor::doMadgwickUpdate(float Axyz[3], float Gxyz[3], float Mxyz[3])
     const float angleDiff = fabsf(quatSmart.angle_to(quat) * (180.f / Math_PI));
     const float accel_q = sqrtf(Axyz[0] * Axyz[0] + Axyz[1] * Axyz[1] + Axyz[2] * Axyz[2]) / EARTH_GRAVITY;
     const float mag_q = sqrtf(Mxyz[0] * Mxyz[0] + Mxyz[1] * Mxyz[1] + Mxyz[2] * Mxyz[2]);
-    
-    //m_Logger.debug("angleDiff : %f | accel_q : %f  | mag_q : %f | lastSmart : %i", angleDiff, accel_q, mag_q, lastSmart);
+    const float gyro_q = (sqrtf(Gxyz[0] * Gxyz[0] + Gxyz[1] * Gxyz[1] + Gxyz[2] * Gxyz[2]) * lastDelta) * (180.f / PI);
+
+    //m_Logger.debug("angleDiff : %f | accel_q : %f  | mag_q : %f| gyro_q : %f | lastSmart : %i ", angleDiff, accel_q, mag_q, gyro_q, lastSmart);
 
     // Smart reset when angle different is too big and accelerator is stable
     if ((angleDiff > SMART_ANGLE_DIFF) && (accel_q > SMART_ACCEL_STABLE && accel_q < 1.f + (1.f - SMART_ACCEL_STABLE))) {
