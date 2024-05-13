@@ -28,18 +28,23 @@
 
 #if BNO_USE_MADGWICK
     #include "madgwick.h"
+
+    #define MADGWICK_BETA_STABLE_DETAULT_MAX 0.2f
+    #define MADGWICK_BETA_STABLE_DETAULT_MIN 0.01f // Compensate for minimal gyro drift
+
+    
+    #define MADGWICK_UPDATE_RATE_MS 5.f
+
+    #define USE_SMART true
+    #define SMART_ANGLE_DIFF 12.5f / 2.f
+    #define SMART_ACCEL_STABLE 0.8f
+    #define SMART_CORRECT_TIME_MS 2000.f
+    #define SMART_BETA 0.2f
 #endif
 
 #define CALIB_MODE_INIT 0
 #define CALIB_MODE_WAIT_GRAVITY 1
 #define CALIB_MODE_DONE 2
-
-#define MADGWICK_UPDATE_RATE_MS 5.f
-
-#define SMART_ANGLE_DIFF 25.0f / 2.f
-#define SMART_ACCEL_STABLE 0.9f
-#define SMART_CORRECT_TIME_MS 1000.f
-#define SMART_BETA 0.9f
 
 void BNO080Sensor::motionSetup()
 {
@@ -437,14 +442,12 @@ void BNO080Sensor::saveCalibration()
 void BNO080Sensor::doMadgwickUpdate(float Axyz[3], float Gxyz[3], float Mxyz[3]) {
     float lastDelta = (millis() - lastMadgwick) / 1000.f;
 
-#define USE_SMART true
-
     //m_Logger.debug("lastDelta : %f", lastDelta);
 
 #if USE_6_AXIS
-    madgwickQuaternionUpdateStable(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], lastDelta);
+    madgwickQuaternionUpdateStable(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], MADGWICK_BETA_STABLE_DETAULT_MIN, MADGWICK_BETA_STABLE_DETAULT_MAX, lastDelta);
 #else
-    madgwickQuaternionUpdateStable(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], lastDelta); //main
+    madgwickQuaternionUpdateStable(q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], MADGWICK_BETA_STABLE_DETAULT_MIN, MADGWICK_BETA_STABLE_DETAULT_MAX, lastDelta); //main
     madgwickQuaternionUpdate(s_q, Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2], Mxyz[0], Mxyz[1], Mxyz[2], lastDelta, SMART_BETA); //smart
 #endif
     lastMadgwick = millis();

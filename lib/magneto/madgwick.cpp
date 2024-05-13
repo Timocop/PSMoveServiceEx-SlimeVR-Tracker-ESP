@@ -1,11 +1,10 @@
 #include "madgwick.h"
 
 #define BETA_DETAULT 0.1f
-#define BETA_STABLE_DETAULT 0.1f
 #define STABILIZATION_GYRO_MAX_DEG 0.25f
 #define STABILIZATION_GYRO_MIN_DEG 0.1f
 
-void madgwickQuaternionUpdateStable(float q[4], float ax, float ay, float az, float gx, float gy, float gz, float deltat)
+void madgwickQuaternionUpdateStable(float q[4], float ax, float ay, float az, float gx, float gy, float gz, float betamin, float betamax, float deltat)
 {
 	float gyro_sq = (float) sqrt(gx * gx + gy * gy + gz * gz) * deltat;
 	gyro_sq = (float) (gyro_sq * (180.f / PI));
@@ -16,10 +15,14 @@ void madgwickQuaternionUpdateStable(float q[4], float ax, float ay, float az, fl
 	if (beta_multi > 1.0f)
 		beta_multi = 1.f;
 
-	madgwickQuaternionUpdate(q, ax, ay, az, gx, gy, gz, deltat, BETA_STABLE_DETAULT * beta_multi);
+	float beta = betamax * beta_multi;
+	if (beta < betamin)
+		beta = betamin;
+
+	madgwickQuaternionUpdate(q, ax, ay, az, gx, gy, gz, deltat, beta);
 }
 
-void madgwickQuaternionUpdateStable(float q[4], float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz, float deltat)
+void madgwickQuaternionUpdateStable(float q[4], float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz, float betamin, float betamax, float deltat)
 {
 	float gyro_sq = (float) sqrt(gx * gx + gy * gy + gz * gz) * deltat;
 	gyro_sq = (float) (gyro_sq * (180.f / PI));
@@ -30,7 +33,11 @@ void madgwickQuaternionUpdateStable(float q[4], float ax, float ay, float az, fl
 	if (beta_multi > 1.0f)
 		beta_multi = 1.f;
 
-	madgwickQuaternionUpdate(q, ax, ay, az, gx, gy, gz, mx, my, mz, deltat, BETA_STABLE_DETAULT * beta_multi);
+	float beta = betamax * beta_multi;
+	if (beta < betamin)
+		beta = betamin;
+
+	madgwickQuaternionUpdate(q, ax, ay, az, gx, gy, gz, mx, my, mz, deltat, beta);
 }
 
 void madgwickQuaternionUpdate(float q[4], float ax, float ay, float az, float gx, float gy, float gz, float deltat)
