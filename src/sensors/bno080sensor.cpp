@@ -29,7 +29,7 @@
 #if BNO_USE_MADGWICK
     #include "madgwick.h"
 
-    #define MADGWICK_BETA_STABLE_DETAULT_MAX 0.2f
+    #define MADGWICK_BETA_STABLE_DETAULT_MAX 0.1f
     #define MADGWICK_BETA_STABLE_DETAULT_MIN 0.01f // Compensate for minimal gyro drift
 
     
