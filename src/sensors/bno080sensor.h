@@ -46,7 +46,7 @@ public:
     void initCalibration();
     void saveCalibration();
 
-    void doMadgwickUpdate(float Axyz[3], float Gxyz[3], float Mxyz[3]);
+    void doMadgwickUpdate(float Axyz[3], float Gxyz[3], float Mxyz[3], float timestamp);
 
 private:
     BNO080 imu{};
@@ -66,15 +66,15 @@ private:
     uint8_t magCalibrationAccuracy = 0;
     float magneticAccuracyEstimate = 999;
     bool newMagData = false;
-    unsigned long lastMadgwick = 0;
     float q[4]{1.0f, 0.0f, 0.0f, 0.0f}; // for raw filter
     float s_q[4]{1.0f, 0.0f, 0.0f, 0.0f}; // for smart filter
     float Axyz[3]{};
     float Gxyz[3]{};
     float Mxyz[3]{};
     float avgGxyz[3]{};
-    float avgGyroSamples = 0;
-
+    unsigned long elapsed_gyro_time = 0;
+    unsigned long lastMadgwick = 0;
+    unsigned long last_gyro_timestamp = 0;
     unsigned long lastSmart = 0;
 };
 
