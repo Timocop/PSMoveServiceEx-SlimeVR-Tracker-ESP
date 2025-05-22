@@ -41,7 +41,7 @@
     #define SMART_ACCEL_STABLE 0.8f
     #define SMART_CORRECT_TIME_MS 2000.f
     #define SMART_BETA 0.2f
-    #define M2S 1.0f / 1000000.0f
+    #define MS2S 1.0f / 1000.0f
 #endif
 
 #define CALIB_MODE_INIT 0
@@ -133,8 +133,7 @@ void BNO080Sensor::motionLoop()
     //Look for reports from the IMU
     while (imu.dataAvailable())
     {
-        unsigned long timeStamp = micros();
-
+        unsigned long timeStamp = millis();
         hadData = true;
 
 #if ENABLE_INSPECTION
@@ -214,15 +213,15 @@ void BNO080Sensor::motionLoop()
 
            if(last_gyro_timestamp != 0)
            {
-                float gyroDelta = (timeStamp - last_gyro_timestamp) * M2S;
+                float gyroDelta = (timeStamp - last_gyro_timestamp) * MS2S;
 
                 avgGxyz[0] += Gxyz[0] * gyroDelta;
                 avgGxyz[1] += Gxyz[1] * gyroDelta;
                 avgGxyz[2] += Gxyz[2] * gyroDelta;
            
-                if ((timeStamp - elapsed_gyro_time) * M2S > MADGWICK_UPDATE_RATE_MS / 1000.0f)
+                if ((timeStamp - elapsed_gyro_time) * MS2S > MADGWICK_UPDATE_RATE_MS / 1000.0f)
                 {
-                    float totalTime = (timeStamp - elapsed_gyro_time) * M2S;
+                    float totalTime = (timeStamp - elapsed_gyro_time) * MS2S;
 
                     float newGxyz[3];
                     newGxyz[0] = avgGxyz[0] / totalTime;
@@ -443,7 +442,7 @@ void BNO080Sensor::saveCalibration()
 
 #if BNO_USE_MADGWICK
 void BNO080Sensor::doMadgwickUpdate(float Axyz[3], float Gxyz[3], float Mxyz[3], float timestamp) {
-    float lastDelta = (timestamp - lastMadgwick) * M2S;
+    float lastDelta = (timestamp - lastMadgwick) * MS2S;
     lastMadgwick = timestamp;
 
     //m_Logger.debug("lastDelta : %f", lastDelta);
